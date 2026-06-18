@@ -6,18 +6,25 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
+
+    // Configure the main application routes
     ->withRouting(
-        web: __DIR__.'/../routes/web.php',
-        commands: __DIR__.'/../routes/console.php',
-        health: '/up',
+        web: __DIR__.'/../routes/web.php', // Web routes
+        commands: __DIR__.'/../routes/console.php', // Artisan console commands
+        health: '/up',  // Health check endpoint
     )
+
+    // Configure application middleware
     ->withMiddleware(function (Middleware $middleware): void {
+         // Add middleware to the web middleware group
         $middleware->web(append: [
             \App\Http\Middleware\HandleInertiaRequests::class,
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
         ]);
 
-        //
+        $middleware->alias([
+            'role' => \App\Http\Middleware\RoleMiddleware::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
