@@ -27,7 +27,7 @@ Sistema de gestión para un restaurante de sushi buffet (all-you-can-eat) con 4 
 - `stations` — estaciones de cocina: `code` (sushi, hot, fry, cold, bar), `label`, `short_label`, `color`
 - `categories` — categorías del menú: `code` (nigiri, maki, wok…), `label`, `sort_order`
 - `tags` — etiquetas de platos: `code` (popular, spicy, raw, veg, gf, chef, premium), `label`
-- `allergens` — alertas dietéticas: `label` (Shellfish allergy, Gluten-free, No raw fish…)
+- `allergens` — alertas dietéticas: `code` (shellfish, gluten, raw_fish…), `label` (Shellfish allergy, Gluten-free, No raw fish…)
 - `settings` — config global (1 fila): `buffet_price`, `waste_fee`, `session_minutes`, `last_call_minutes`, `tax_rate`
 
 ### Tablas de menú

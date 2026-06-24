@@ -22,5 +22,11 @@ class DatabaseSeeder extends Seeder
             'email' => 'test@example.com',
             'role' => 'admin',
         ]);
+
+        $this->call(StationSeeder::class);
+        $this->call(CategorySeeder::class);
+        $this->call(TagSeeder::class);
+        $this->call(AllergenSeeder::class);
+        $this->call(SettingSeeder::class);
     }
 }

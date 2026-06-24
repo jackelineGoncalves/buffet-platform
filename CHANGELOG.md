@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] - 2026-06-24
+
+### Added
+- Catalog tables for the menu domain: `stations`, `categories`, `tags`, `allergens`, `settings`, with migrations, Eloquent models (`Station`, `Category`, `Tag`, `Allergen`, `Setting`), and seeders (`StationSeeder`, `CategorySeeder`, `TagSeeder`, `AllergenSeeder`, `SettingSeeder`).
+- `DatabaseSeeder` now calls the new catalog seeders.
+- Claude Code skills (`laravel-specialist`, `php-pro`) under `.claude/skills/` to guide Laravel/PHP development conventions in this repo.
+
+### Tests
+- Added `StationSeederTest`, `CategorySeederTest`, `TagSeederTest`, `AllergenSeederTest`, `SettingSeederTest`.
+
 ## [Unreleased] - 2026-06-17
 
 ### Added
