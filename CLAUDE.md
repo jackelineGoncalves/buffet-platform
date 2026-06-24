@@ -1,117 +1,75 @@
-# CLAUDE.md — Ninja Sushi Platform (Laravel / PHP)
+# CLAUDE.md
 
-## Qué es este proyecto
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Sistema de gestión para un restaurante de sushi buffet (all-you-can-eat) con 4 roles:
+## Project Overview
 
-- **Diner** (móvil): se une a una mesa, ordena por rondas, pide la cuenta o un mesero.
-- **Kitchen** (KDS): pantalla de cocina por estación, avanza platos `firing → ready → served`.
-- **Floor** (gerente): supervisa mesas, temporizadores de sesión, desperdicio, solicitudes.
-- **Admin**: edita el menú, precios, disponibilidad de platos.
+A buffet/restaurant management platform built on **Laravel 13 + Inertia.js + React 18**. It serves two distinct audiences from one app:
 
-## Reglas de negocio clave
+- **Staff** (authenticated, role-gated): `admin`, `kitchen`, `floor` roles managing dishes, orders, and dining sessions.
+- **Diners** (unauthenticated, public): access a table-specific ordering flow via `/table/{code}`.
 
-- **Precio buffet**: tarifa fija por comensal (ej. $32.00), configurable en tabla `settings`.
-- **Cargo por desperdicio**: por artículo no consumido marcado (ej. $6.00), configurable.
-- **Sesión de 120 minutos** por mesa con ventana de "last call" de 20 min antes del cierre.
-- Algunos platos tienen **precio adicional** (à-la-carte): campo `price` en `dishes`.
-    - `price IS NULL` = incluido en buffet
-    - `price = valor` = add-on con costo extra
-- Algunos platos tienen **límite por ronda** (`per_round_limit`).
-- **Facturación**: buffet_price × guests + extras + waste_fee × waste_count + impuesto (8.75%).
+## Commands
 
-## Estructura de base de datos
+```bash
+# Setup (composer install, .env, key:generate, migrate, npm install+build)
+npm run setup
 
-### Tablas de referencia / catálogos (sembrar con seeders)
+# Local development (runs server, queue listener, log tailing, and Vite concurrently)
+npm run dev
 
-- `stations` — estaciones de cocina: `code` (sushi, hot, fry, cold, bar), `label`, `short_label`, `color`
-- `categories` — categorías del menú: `code` (nigiri, maki, wok…), `label`, `sort_order`
-- `tags` — etiquetas de platos: `code` (popular, spicy, raw, veg, gf, chef, premium), `label`
-- `allergens` — alertas dietéticas: `code` (shellfish, gluten, raw_fish…), `label` (Shellfish allergy, Gluten-free, No raw fish…)
-- `settings` — config global (1 fila): `buffet_price`, `waste_fee`, `session_minutes`, `last_call_minutes`, `tax_rate`
+# Frontend only
+npm run build            # production build of resources/js via Vite
 
-### Tablas de menú
+# Backend only
+php artisan serve
+php artisan queue:listen
+php artisan pail         # real-time log streaming
 
-- `dishes` — platos del menú:
-    - `name`, `description`, `prep_minutes`
-    - `category_id` FK → categories
-    - `station_id` FK → stations
-    - `price` decimal nullable (`NULL` = buffet, valor = add-on)
-    - `per_round_limit` integer nullable
-    - `is_available` boolean
-    - `is_custom` boolean (creado por admin vs sembrado)
-    - `sort_order`
-- `dish_tag` — pivot dishes ↔ tags
+# Tests
+composer test            # clears config cache, then runs `php artisan test`
+php artisan test --filter=TestName     # run a single test
+php artisan test tests/Feature/OrderTest.php   # run a single test file
+```
 
-### Tablas operacionales
+There is no ESLint/Prettier/Pint config wired up yet, even though Laravel Pint is a dev dependency — don't assume a lint step exists.
 
-- `restaurant_tables` — mesas físicas: `code` (T1, T2…), `seats`
-- `dining_sessions` — sesión de mesa activa:
-    - `restaurant_table_id` FK
-    - `guests` integer
-    - `status` enum: `seated`, `bill`, `paid`, `closed`
-    - `waste_count` integer default 0
-    - `opened_at`, `closed_at` timestamps
-- `orders` — ronda de pedido:
-    - `dining_session_id` FK
-    - `number` integer (ticket# visible)
-    - `round` integer (1a, 2a ronda…)
-    - `status` enum: `new`, `prep`, `ready`, `served`
-    - `placed_at` timestamp
-- `order_items` — línea por plato:
-    - `order_id` FK
-    - `dish_id` FK nullable (snapshot por si el plato se elimina)
-    - `name` string (snapshot)
-    - `station_id` FK (snapshot para routing KDS)
-    - `unit_price` decimal nullable (snapshot; null = buffet)
-    - `qty` integer
-    - `status` enum: `firing`, `ready`, `served`
-    - `note` string nullable (ej. "birthday — no rush")
-- `order_item_allergens` — alertas por línea:
-    - `order_item_id` FK
-    - `allergen_id` FK nullable
-    - `label` string (snapshot)
-- `service_requests` — solicitudes del comensal:
-    - `dining_session_id` FK
-    - `type` enum: `bill`, `server`
-    - `requested_at` timestamp
-    - `resolved_at` timestamp nullable (null = pendiente)
-- `payments` — factura liquidada (snapshot al cobrar):
-    - `dining_session_id` FK
-    - `guests`, `buffet_total`, `extras_total`, `waste_total`, `tax`, `total`
-    - `paid_at` timestamp
-- `users` — staff: `name`, `email`, `password`, `role` enum (`kitchen`, `floor`, `admin`)
+## Architecture
 
-## Relaciones Eloquent
+### Auth & roles
 
-Station hasMany Dishes
-Category hasMany Dishes
-Dish belongsToMany Tags (dish_tag)
-RestaurantTable hasMany DiningSessions
-DiningSession hasMany Orders
-DiningSession hasMany ServiceRequests
-DiningSession hasOne Payment
-Order hasMany OrderItems
-OrderItem hasMany OrderItemAllergens
+- `App\Models\User` has a `role` column: `admin`, `kitchen`, or `floor`. There is no diner account — diners interact via signed table codes, not auth.
+- `App\Http\Middleware\RoleMiddleware` enforces role checks via `middleware('role:admin')` or `role:kitchen,floor` (comma-separated, OR semantics), aborting 403 on mismatch.
+- `routes/web.php` exposes role-specific dashboards (`/admin`, `/kitchen`, `/floor`) gated by this middleware, plus the public `/table/{code}` diner flow (no auth).
+- `routes/auth.php` is Breeze-style auth (login, password reset); registration is restricted to `admin` only — staff accounts are provisioned, not self-registered.
+- Sanctum is installed (`config/sanctum.php`) but the primary session flow is Inertia/cookie-based, not token API auth.
 
-## Convenciones importantes
+### Domain model
 
-- **Snapshots en `order_items`**: guardar `name`, `unit_price`, `station_id` al momento de ordenar. El menú puede cambiar; el historial no.
-- **`dish_id` nullable** en `order_items`: mantiene la FK para reportes pero no rompe el historial si el plato se borra.
-- **`orders.status`** puede ser derivado de sus `order_items.status` (si todos son `served` → `served`, etc.) o cacheado. Preferir un accessor Eloquent que lo compute, y sincronizar el campo al avanzar items.
-- **Indexes recomendados**: `orders.dining_session_id`, `order_items.order_id`, `order_items.(status, station_id)` (el KDS filtra por estación y estado `firing`), `dining_sessions.status`.
+The core entity is the **dining session**, anchored to a physical table:
 
-## Flujo de una sesión completa
+- `RestaurantTable` → has many `DiningSession`
+- `DiningSession` (status `seated`/`bill`/`paid`/`closed` — only `closed` is considered inactive) → has many `Order`, has many `ServiceRequest`, has one `Payment`
+  - "One active session per table" is enforced at two levels: an app-level pre-check in the model's `creating` event (fast-fail, throws `App\Exceptions\TableOccupiedException`), and a partial unique index on `dining_sessions (restaurant_table_id) WHERE status != 'closed'` (added in the `add_one_active_session_per_table_constraint` migration) that closes the race-condition gap the app-level check can't cover. `DiningSession::performInsert()` catches the index violation and rethrows it as the same `TableOccupiedException`. The partial-index approach only works on SQLite/Postgres, not MySQL.
+- `Order` (status `new`/`prep`/`ready`/`served`, has a `round` number) → has many `OrderItem`
+  - `Order::syncStatusFromItems()` derives the order's status from the aggregate state of its items — call this after mutating item statuses rather than setting order status directly.
+- `OrderItem` (status `firing`/`ready`/`served`) → belongs to `Order`, `Dish`, `Station`; has many `OrderItemAllergen`
+- `Dish` → belongs to `Category` and `Station`; belongs-to-many `Tag`
+- `OrderItemAllergen` → links an `OrderItem` to an `Allergen`, capturing a point-in-time `label` (so historical orders aren't affected by later allergen renames)
+- `Payment` → belongs to `DiningSession`; tracks `buffet_total`, `extras_total`, `waste_total`, `tax`, `total`
+- `Setting` is a singleton-style config row (`buffet_price`, `waste_fee`, `session_minutes`, `last_call_minutes`, `tax_rate`) driving pricing/timing logic across sessions
 
-1. Staff abre mesa → crea `dining_session` (`status=seated`, `opened_at=now`)
-2. Comensal selecciona platos → acumula carrito solo en frontend
-3. Comensal confirma ronda → crea `order` + `order_items` con `status=firing`
-4. Kitchen ve tickets por estación → avanza items: `firing → ready → served`
-5. Comensal pide cuenta → crea `service_request` tipo `bill`, `dining_session.status=bill`
-6. Floor cobra → crea `payment`, `dining_session.status=paid → closed`
+When adding features that touch order/session state, check both `Order` and `DiningSession` for derived-status logic before writing new state transitions.
 
-## Fuera de alcance por ahora
+### Frontend (Inertia + React)
 
-- Modificadores de platos (spice level, sushi preferences, etc.)
-- Notificaciones en tiempo real (Laravel Reverb / Pusher)
-- Módulo de reportes
+- Entry point `resources/js/app.jsx` resolves page components from `resources/js/Pages/**/*.jsx` — there is no separate REST/JSON API layer for the frontend; controllers return Inertia responses directly.
+- `resources/js/Pages/` is organized by audience: `Diner/` for the public table flow, plus `Auth/`, `Dashboard.jsx`, `Profile/` for staff.
+- `App\Http\Middleware\HandleInertiaRequests` shares `auth.user` (and other global props) with every page — add new globally-needed props here rather than per-controller.
+- Shared UI lives in `resources/js/Components/`, layouts in `resources/js/Layouts/`.
+
+### Tests
+
+- PHPUnit (`phpunit.xml`), suites under `tests/Unit/` and `tests/Feature/`.
+- Uses SQLite in-memory for the test DB, `sync` queue, array cache/session — tests don't need external services.
+- Feature tests are organized per-model/domain concern (e.g. `tests/Feature/OrderTest.php`, `DiningSessionTest.php`, `OrderItemAllergenTest.php`).
