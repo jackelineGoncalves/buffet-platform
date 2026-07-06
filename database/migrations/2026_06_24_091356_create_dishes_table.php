@@ -22,6 +22,7 @@ return new class extends Migration
             $table->unsignedInteger('per_round_limit')->nullable();
             $table->boolean('is_available')->default(true);
             $table->boolean('is_custom')->default(false);
+            $table->boolean('is_extra')->default(false);
             $table->unsignedInteger('sort_order')->default(0);
             $table->timestamps();
         });

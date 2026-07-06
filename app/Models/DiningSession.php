@@ -10,6 +10,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\QueryException;
+use App\Models\Allergen;
+use App\Models\Dish;
+use Illuminate\Support\Facades\DB;
 
 #[Fillable([
     'restaurant_table_id',
@@ -49,6 +52,43 @@ class DiningSession extends Model
     public function payment(): HasOne
     {
         return $this->hasOne(Payment::class);
+    }
+
+    public function placeOrder(array $items): Order
+    {
+        return DB::transaction(function () use ($items) {
+            $nextRound = ((int) $this->orders()->max('round')) + 1;
+
+            $order = $this->orders()->create([
+                'number' => $nextRound,
+                'round' => $nextRound,
+                'placed_at' => now(),
+            ]);
+
+            foreach ($items as $item) {
+                $dish = Dish::findOrFail($item['dish_id']);
+
+                $orderItem = $order->orderItems()->create([
+                    'dish_id' => $dish->id,
+                    'name' => $dish->name,
+                    'station_id' => $dish->station_id,
+                    'unit_price' => $dish->price,
+                    'qty' => $item['qty'],
+                    'note' => $item['note'] ?? null,
+                ]);
+
+                foreach ($item['allergen_ids'] ?? [] as $allergenId) {
+                    $allergen = Allergen::findOrFail($allergenId);
+
+                    $orderItem->orderItemAllergens()->create([
+                        'allergen_id' => $allergen->id,
+                        'label' => $allergen->label,
+                    ]);
+                }
+            }
+
+            return $order->load('orderItems.orderItemAllergens');
+        });
     }
 
     protected static function booted(): void
