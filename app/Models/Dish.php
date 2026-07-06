@@ -17,14 +17,20 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
     'per_round_limit',
     'is_available',
     'is_custom',
+    'is_extra',
     'sort_order',
 ])]
 class Dish extends Model
 {
+    protected $attributes = [
+        'is_extra' => false,
+    ];
+
     protected $casts = [
         'price' => 'decimal:2',
         'is_available' => 'boolean',
         'is_custom' => 'boolean',
+        'is_extra' => 'boolean',
     ];
 
     public function category(): BelongsTo

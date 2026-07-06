@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Controllers\Diner\DinerOrderController;
+use App\Http\Controllers\Diner\DinerSessionController;
+use App\Http\Controllers\Diner\DinerTableController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
@@ -40,10 +43,10 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-Route::get('/table/{code}', function (string $code) {
-    return Inertia::render('Diner/Table', [
-        'code' => $code,
-    ]);
-})->name('diner.table');
+Route::post('/table/{code}/session', [DinerSessionController::class, 'store'])->name('diner.session.store');
+
+Route::post('/table/{code}/orders', [DinerOrderController::class, 'store'])->name('diner.orders.store');
+
+Route::get('/table/{code}', [DinerTableController::class, 'show'])->name('diner.table');
 
 require __DIR__.'/auth.php';

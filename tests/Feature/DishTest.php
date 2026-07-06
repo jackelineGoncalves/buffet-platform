@@ -110,4 +110,33 @@ class DishTest extends TestCase
 
         $this->assertCount(1, $category->dishes);
     }
+
+    public function test_dish_is_extra_defaults_to_false(): void
+    {
+        $category = Category::create(['code' => 'mains', 'label' => 'Mains', 'sort_order' => 1]);
+        $station = Station::create(['code' => 'grill', 'label' => 'Grill', 'short_label' => 'GR', 'color' => '#ff0000']);
+
+        $dish = Dish::create([
+            'name' => 'Grilled Chicken',
+            'category_id' => $category->id,
+            'station_id' => $station->id,
+        ]);
+
+        $this->assertFalse($dish->is_extra);
+    }
+
+    public function test_dish_is_extra_can_be_set_true(): void
+    {
+        $category = Category::create(['code' => 'drinks', 'label' => 'Drinks', 'sort_order' => 2]);
+        $station = Station::create(['code' => 'bar', 'label' => 'Bar', 'short_label' => 'BAR', 'color' => '#00ff00']);
+
+        $dish = Dish::create([
+            'name' => 'Craft Soda',
+            'category_id' => $category->id,
+            'station_id' => $station->id,
+            'is_extra' => true,
+        ]);
+
+        $this->assertTrue($dish->is_extra);
+    }
 }

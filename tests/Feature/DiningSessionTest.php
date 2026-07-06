@@ -3,9 +3,13 @@
 namespace Tests\Feature;
 
 use App\Exceptions\TableOccupiedException;
+use App\Models\Allergen;
+use App\Models\Category;
 use App\Models\DiningSession;
+use App\Models\Dish;
 use App\Models\Order;
 use App\Models\RestaurantTable;
+use App\Models\Station;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -149,5 +153,76 @@ class DiningSessionTest extends TestCase
         ]);
 
         $this->assertTrue($second->exists);
+    }
+
+    public function test_place_order_creates_an_order_with_snapshotted_items(): void
+    {
+        $table = RestaurantTable::create(['code' => 'T1', 'seats' => 4]);
+        $session = DiningSession::create([
+            'restaurant_table_id' => $table->id,
+            'guests' => 3,
+            'opened_at' => now(),
+        ]);
+
+        $category = Category::create(['code' => 'mains', 'label' => 'Mains', 'sort_order' => 1]);
+        $station = Station::create(['code' => 'grill', 'label' => 'Grill', 'short_label' => 'GR', 'color' => '#ff0000']);
+        $dish = Dish::create([
+            'name' => 'Grilled Chicken',
+            'category_id' => $category->id,
+            'station_id' => $station->id,
+            'price' => 12.50,
+        ]);
+        $allergen = Allergen::create(['code' => 'nuts', 'label' => 'Contains nuts']);
+
+        $order = $session->placeOrder([
+            [
+                'dish_id' => $dish->id,
+                'qty' => 2,
+                'note' => 'No salt',
+                'allergen_ids' => [$allergen->id],
+            ],
+        ]);
+
+        $this->assertSame(1, $order->round);
+        $this->assertSame(1, $order->number);
+        $this->assertSame($session->id, $order->dining_session_id);
+
+        $item = $order->orderItems->first();
+        $this->assertSame('Grilled Chicken', $item->name);
+        $this->assertEquals(12.50, $item->unit_price);
+        $this->assertSame(2, $item->qty);
+        $this->assertSame('No salt', $item->note);
+        $this->assertSame($station->id, $item->station_id);
+        $this->assertSame('firing', $item->status);
+
+        $itemAllergen = $item->orderItemAllergens->first();
+        $this->assertSame('Contains nuts', $itemAllergen->label);
+        $this->assertSame($allergen->id, $itemAllergen->allergen_id);
+    }
+
+    public function test_place_order_increments_round_and_number_on_successive_calls(): void
+    {
+        $table = RestaurantTable::create(['code' => 'T1', 'seats' => 4]);
+        $session = DiningSession::create([
+            'restaurant_table_id' => $table->id,
+            'guests' => 3,
+            'opened_at' => now(),
+        ]);
+
+        $category = Category::create(['code' => 'mains', 'label' => 'Mains', 'sort_order' => 1]);
+        $station = Station::create(['code' => 'grill', 'label' => 'Grill', 'short_label' => 'GR', 'color' => '#ff0000']);
+        $dish = Dish::create([
+            'name' => 'Grilled Chicken',
+            'category_id' => $category->id,
+            'station_id' => $station->id,
+            'price' => 12.50,
+        ]);
+
+        $first = $session->placeOrder([['dish_id' => $dish->id, 'qty' => 1]]);
+        $second = $session->placeOrder([['dish_id' => $dish->id, 'qty' => 1]]);
+
+        $this->assertSame(1, $first->round);
+        $this->assertSame(2, $second->round);
+        $this->assertSame(2, $second->number);
     }
 }

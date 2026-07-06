@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] - 2026-07-06
+
+### Added
+- `is_extra` boolean column on `dishes` (default `false`) to distinguish buffet-included dishes from paid add-ons shown with their price in the diner UI.
+- `DiningSession::placeOrder(array $items): Order` — domain method that creates an order inside a session: auto-increments the round number, snapshots each dish's name/price/station at order time, captures allergens as `OrderItemAllergen` records (with snapshot `label`), all inside a DB transaction.
+- `DinerTableController@show` (`GET /table/{code}`): resolves the table by code (404 on miss), loads the active (non-`closed`) session with its orders/items/allergens, builds the categorised menu (available dishes only), and passes everything to the Inertia `Diner/Table` page.
+- `DinerSessionController@store` (`POST /table/{code}/session`): opens a new dining session; returns 409 with the existing session if one is already active, using `TableOccupiedException` as the signal.
+- `DinerOrderController@store` (`POST /table/{code}/orders`): places a new order round on the active session; returns 409 when no session is open.
+- `StoreDinerSessionRequest`: validates `guests` is a positive integer.
+- `StoreDinerOrderRequest`: validates the `items` array (each item needs an existing `dish_id`, `qty ≥ 1`, optional `note`, optional `allergen_ids` that exist in the DB); a `withValidator` hook adds a second-pass DB check that rejects any dish with `is_available = false`.
+- `DishSeeder` and `RestaurantTableSeeder` with example data (11 sushi dishes including extras, 3 tables T1–T3); both registered in `DatabaseSeeder`.
+- CSRF token meta tag in `resources/views/app.blade.php` so frontend `fetch()` calls can sign POST requests without Axios.
+
+### Changed
+- `GET /table/{code}` replaced the previous anonymous closure with `DinerTableController@show`, now returning a full data payload instead of just the raw code string.
+- `bootstrap/app.php`: JSON error responses are now returned whenever the request `expectsJson()`, not only for `/api/*` routes — required for `fetch()`-based calls from the diner frontend to receive parseable error bodies.
+- `Diner/Table.jsx` rewritten from a static placeholder into a full interactive diner UI: `OpenSessionForm` (opens a session when none is active), `OrdersList` (shows previous rounds), and `MenuAndCart`/`CartRow` (per-dish quantity, note, and allergen checkboxes); mutations use `fetch()` + CSRF, then `router.reload()` to refresh Inertia props.
+- `DinerTableRouteTest` updated to create a real `RestaurantTable` row before hitting the route (controller now does a DB lookup).
+
+### Tests
+- Added `DinerSessionControllerTest`: covers session creation, 409 on duplicate, 404 for unknown table code, validation rejection of invalid `guests`.
+- Added `DinerOrderControllerTest`: covers successful order with allergens, round-number increment across successive submissions, 409 with no active session, 404 for unknown table code, rejection of unavailable dishes, non-existent dish IDs, and non-existent allergen IDs.
+- Added two `DishTest` cases for `is_extra` default value and explicit `true` assignment.
+- Added two `DiningSessionTest` cases for `placeOrder()`: snapshot fidelity (name, price, station, allergen label, default `firing` status) and round-number auto-increment across successive calls.
+- Added `DinerTableRouteTest` case for 404 on an unknown table code.
+
 ## [Unreleased] - 2026-06-24
 
 ### Added
