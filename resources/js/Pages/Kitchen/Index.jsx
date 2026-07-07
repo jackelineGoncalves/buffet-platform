@@ -176,21 +176,23 @@ export default function Kitchen({ initialItems, stations }) {
 
     const advanceItem = useCallback(async (itemId, currentStatus) => {
         const next = { firing: 'prep', prep: 'ready', ready: 'served' }[currentStatus];
-        setItems(prev =>
-            prev
+        let snapshot = null;
+        setItems(prev => {
+            snapshot = prev.find(i => i.id === itemId) ?? null;
+            return prev
                 .map(i => i.id === itemId ? { ...i, status: next } : i)
-                .filter(i => i.status !== 'served')
-        );
+                .filter(i => i.status !== 'served');
+        });
         try {
             const res = await fetch(`/kitchen/order-items/${itemId}`, {
                 method: 'PATCH',
                 headers: { 'X-CSRF-TOKEN': csrfToken(), Accept: 'application/json' },
             });
             if (!res.ok) {
-                setItems(prev => prev.map(i => i.id === itemId ? { ...i, status: currentStatus } : i));
+                setItems(prev => snapshot ? [...prev, snapshot] : prev);
             }
         } catch {
-            setItems(prev => prev.map(i => i.id === itemId ? { ...i, status: currentStatus } : i));
+            setItems(prev => snapshot ? [...prev, snapshot] : prev);
         }
     }, []);
 
