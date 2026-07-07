@@ -2,6 +2,38 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] - 2026-07-07
+
+### Added
+- **Kitchen display (`/kitchen`):** Real-time order management view for staff with `role=kitchen` or `role=admin`. Shows all active order items grouped by table and round in a three-column kanban (Sin preparar / En preparación / Listos para entregar). Items advance independently through their lifecycle and disappear from view when marked as served.
+- `prep` status added to `order_items.status` enum (`firing → prep → ready → served`) to match the three active columns. Previously only `firing` and `ready` existed.
+- `KitchenIndexController@index` (`GET /kitchen`): loads all `OrderItem` records with status `firing`, `prep`, or `ready`, eager-loaded with `order.diningSession.restaurantTable`, `orderItemAllergens`, and `station`. Passes `initialItems` and `stations` to the Inertia `Kitchen/Index` page.
+- `KitchenOrderItemController@advance` (`PATCH /kitchen/order-items/{orderItem}`): advances an item's status one step (`firing→prep`, `prep→ready`, `ready→served`), calls `Order::syncStatusFromItems()` to keep the parent order's cached status in sync, and dispatches `OrderItemStatusUpdated`.
+- **Laravel Reverb** installed as the WebSocket server; `resources/js/echo.js` configures the Laravel Echo frontend client connected to the `reverb` broadcaster. Echo is imported globally in `app.jsx`.
+- `OrderPlaced` broadcast event (`ShouldBroadcastNow`) — dispatched by `DiningSession::placeOrder()` after the transaction commits. Broadcasts on the private `kitchen` channel with the full order payload (table code, round, all items with allergens and station).
+- `OrderItemStatusUpdated` broadcast event (`ShouldBroadcastNow`) — dispatched by `KitchenOrderItemController@advance` after each status change. Broadcasts `order_item_id`, `order_id`, and new `status` on the private `kitchen` channel.
+- Kitchen channel authorization in `routes/channels.php`: users with `role=kitchen` or `role=admin` are granted access to `Broadcast::channel('kitchen', ...)`.
+- **`Kitchen/Index.jsx`** — full real-time React page:
+  - `StationFilter`: "Todas" + one button per station; active station filters item visibility across all columns.
+  - `RoundCard`: shows table code, round number, and elapsed time since `placed_at`; yellow border/background for newly arrived orders (3-second highlight); red border for rounds with any item overdue in `firing` (>10 min).
+  - `ItemRow`: displays qty × name, optional note, optional allergen labels, and a per-status advance button ("▶ En preparación", "▶ Listo", "✓ Servido"). Clicking fires an optimistic state update immediately, then PATCHes the server; rolls back cleanly on failure (including the `ready→served` case where the item was already removed from the array).
+  - Echo subscription on `window.Echo.private('kitchen')`: `.listen('.OrderPlaced', ...)` plays a beep (Web Audio API) and adds the new items to state; `.listen('.OrderItemStatusUpdated', ...)` patches the matching item or removes it if now `served`.
+  - Reconnect resync: if the WebSocket drops and reconnects, `router.reload({ only: ['initialItems'] })` is called to resync the board.
+  - A 30-second tick drives elapsed/overdue recalculation without polling the server.
+
+### Changed
+- `Order::syncStatusFromItems()` updated: any item in `firing` **or** `prep` now drives the order status to `prep` (previously only `firing` was checked). This keeps the `orders.status` column consistent with the four-step item lifecycle.
+- `DiningSession::placeOrder()` now dispatches `OrderPlaced` after the transaction; the dispatch is wrapped in try/catch so a Reverb outage cannot 500 the diner's request — the order is always persisted regardless of broadcast availability.
+- `GET /kitchen` and `PATCH /kitchen/order-items/{orderItem}` routes replaced the previous `kitchen.dashboard` anonymous closure with a proper named-route group under `middleware(['auth', 'role:kitchen,admin'])`.
+- `AuthenticatedSessionController` post-login redirect updated from the deleted `kitchen.dashboard` route name to `kitchen.index`.
+- `bootstrap/app.php`: `channels:` key added to `withRouting()` to register `routes/channels.php` (done automatically by `reverb:install`).
+
+### Tests
+- `OrderTest`: added `test_sync_status_from_items_is_prep_when_any_item_is_in_prep()` — verifies that a mix of `ready` + `prep` items drives order status to `prep`.
+- `DiningSessionTest`: added `test_place_order_dispatches_order_placed_event()` — uses `Event::fake()` to assert `OrderPlaced` is dispatched with the correct order.
+- Added `tests/Feature/Kitchen/KitchenIndexTest.php` (4 tests): 200 for kitchen user, redirect to login for unauthenticated, 403 for non-kitchen role, only active items (`firing`/`prep`/`ready`) included in `initialItems` prop.
+- Added `tests/Feature/Kitchen/KitchenOrderItemControllerTest.php` (7 tests): `firing→prep`, `prep→ready`, `ready→served` each return 200 and persist; order status reflects correct derived state after advance; 422 for already-`served` item; 403 for non-kitchen role; `OrderItemStatusUpdated` dispatched with correct payload.
+
 ## [Unreleased] - 2026-07-06
 
 ### Added

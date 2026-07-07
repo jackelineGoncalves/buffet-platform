@@ -3,6 +3,8 @@
 use App\Http\Controllers\Diner\DinerOrderController;
 use App\Http\Controllers\Diner\DinerSessionController;
 use App\Http\Controllers\Diner\DinerTableController;
+use App\Http\Controllers\Kitchen\KitchenIndexController;
+use App\Http\Controllers\Kitchen\KitchenOrderItemController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
@@ -29,9 +31,10 @@ Route::middleware(['auth', 'role:admin'])->get('/admin', function () {
     return Inertia::render('Dashboard');
 })->name('admin.dashboard');
 
-Route::middleware(['auth', 'role:kitchen'])->get('/kitchen', function () {
-    return Inertia::render('Dashboard');
-})->name('kitchen.dashboard');
+Route::middleware(['auth', 'role:kitchen,admin'])->prefix('kitchen')->name('kitchen.')->group(function () {
+    Route::get('/', [KitchenIndexController::class, 'index'])->name('index');
+    Route::patch('/order-items/{orderItem}', [KitchenOrderItemController::class, 'advance'])->name('order-items.advance');
+});
 
 Route::middleware(['auth', 'role:floor'])->get('/floor', function () {
     return Inertia::render('Dashboard');

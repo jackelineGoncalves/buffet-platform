@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Events\OrderPlaced;
 use App\Exceptions\TableOccupiedException;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -56,7 +57,7 @@ class DiningSession extends Model
 
     public function placeOrder(array $items): Order
     {
-        return DB::transaction(function () use ($items) {
+        $order = DB::transaction(function () use ($items) {
             $nextRound = ((int) $this->orders()->max('round')) + 1;
 
             $order = $this->orders()->create([
@@ -89,6 +90,14 @@ class DiningSession extends Model
 
             return $order->load('orderItems.orderItemAllergens');
         });
+
+        try {
+            OrderPlaced::dispatch($order);
+        } catch (\Throwable $e) {
+            \Log::error('OrderPlaced broadcast failed', ['error' => $e->getMessage(), 'order_id' => $order->id]);
+        }
+
+        return $order;
     }
 
     protected static function booted(): void

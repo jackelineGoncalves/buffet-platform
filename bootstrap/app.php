@@ -11,6 +11,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php', // Web routes
         commands: __DIR__.'/../routes/console.php', // Artisan console commands
+        channels: __DIR__.'/../routes/channels.php',
         health: '/up',  // Health check endpoint
     )
 

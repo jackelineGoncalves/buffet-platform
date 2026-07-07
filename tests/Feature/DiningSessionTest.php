@@ -13,6 +13,7 @@ use App\Models\Station;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
 
 class DiningSessionTest extends TestCase
@@ -198,6 +199,30 @@ class DiningSessionTest extends TestCase
         $itemAllergen = $item->orderItemAllergens->first();
         $this->assertSame('Contains nuts', $itemAllergen->label);
         $this->assertSame($allergen->id, $itemAllergen->allergen_id);
+    }
+
+    public function test_place_order_dispatches_order_placed_event(): void
+    {
+        Event::fake([\App\Events\OrderPlaced::class]);
+
+        $table = RestaurantTable::create(['code' => 'T1', 'seats' => 4]);
+        $session = DiningSession::create([
+            'restaurant_table_id' => $table->id,
+            'guests' => 2,
+            'opened_at' => now(),
+        ]);
+        $category = Category::create(['code' => 'mains', 'label' => 'Mains', 'sort_order' => 1]);
+        $station = Station::create(['code' => 'grill', 'label' => 'Grill', 'short_label' => 'GR', 'color' => '#ff0000']);
+        $dish = Dish::create([
+            'name' => 'Chicken',
+            'category_id' => $category->id,
+            'station_id' => $station->id,
+            'price' => 10.00,
+        ]);
+
+        $session->placeOrder([['dish_id' => $dish->id, 'qty' => 1]]);
+
+        Event::assertDispatched(\App\Events\OrderPlaced::class);
     }
 
     public function test_place_order_increments_round_and_number_on_successive_calls(): void

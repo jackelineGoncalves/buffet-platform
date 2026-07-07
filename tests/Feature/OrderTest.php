@@ -177,4 +177,23 @@ class OrderTest extends TestCase
 
         $this->assertEquals('served', $order->status);
     }
+
+    public function test_sync_status_from_items_is_prep_when_any_item_is_in_prep(): void
+    {
+        $session = $this->makeSession();
+        $order = Order::create([
+            'dining_session_id' => $session->id,
+            'number' => 1,
+            'round' => 1,
+            'placed_at' => now(),
+        ]);
+        $station = Station::create(['code' => 'grill', 'label' => 'Grill', 'short_label' => 'GR', 'color' => '#fff']);
+
+        OrderItem::create(['order_id' => $order->id, 'name' => 'Chicken', 'station_id' => $station->id, 'qty' => 1, 'status' => 'ready']);
+        OrderItem::create(['order_id' => $order->id, 'name' => 'Steak', 'station_id' => $station->id, 'qty' => 1, 'status' => 'prep']);
+
+        $order->syncStatusFromItems();
+
+        $this->assertEquals('prep', $order->fresh()->status);
+    }
 }
