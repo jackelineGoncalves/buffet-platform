@@ -19,7 +19,7 @@ return new class extends Migration
             $table->foreignId('station_id')->constrained()->restrictOnDelete();
             $table->decimal('unit_price', 8, 2)->nullable();
             $table->unsignedInteger('qty');
-            $table->enum('status', ['firing', 'ready', 'served'])->default('firing');
+            $table->enum('status', ['firing', 'prep', 'ready', 'served'])->default('firing');
             $table->string('note')->nullable();
             $table->timestamps();
 

@@ -34,7 +34,7 @@ class Order extends Model
 
         $status = match (true) {
             $statuses->isEmpty() => 'new',
-            $statuses->contains('firing') => 'prep',
+            $statuses->contains('firing') || $statuses->contains('prep') => 'prep',
             $statuses->every(fn ($itemStatus) => $itemStatus === 'served') => 'served',
             default => 'ready',
         };
