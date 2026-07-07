@@ -91,7 +91,11 @@ class DiningSession extends Model
             return $order->load('orderItems.orderItemAllergens');
         });
 
-        OrderPlaced::dispatch($order);
+        try {
+            OrderPlaced::dispatch($order);
+        } catch (\Throwable $e) {
+            \Log::error('OrderPlaced broadcast failed', ['error' => $e->getMessage(), 'order_id' => $order->id]);
+        }
 
         return $order;
     }

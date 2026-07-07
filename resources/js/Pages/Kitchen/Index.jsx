@@ -1,4 +1,4 @@
-import { Head } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 
 function csrfToken() {
@@ -14,9 +14,10 @@ function playBeep() {
         gain.connect(ctx.destination);
         osc.frequency.value = 880;
         gain.gain.setValueAtTime(0.3, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-        osc.start(ctx.currentTime);
-        osc.stop(ctx.currentTime + 0.3);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.4);
+        osc.onended = () => ctx.close();
     } catch (_) {}
 }
 
@@ -171,7 +172,24 @@ export default function Kitchen({ initialItems, stations }) {
         window.Echo.private('kitchen')
             .listen('.OrderPlaced', handleOrderPlaced)
             .listen('.OrderItemStatusUpdated', handleItemUpdated);
-        return () => window.Echo.leave('kitchen');
+
+        const conn = window.Echo.connector.pusher.connection;
+        let wasDisconnected = false;
+        const onDisconnected = () => { wasDisconnected = true; };
+        const onConnected = () => {
+            if (wasDisconnected) {
+                wasDisconnected = false;
+                router.reload({ only: ['initialItems'] });
+            }
+        };
+        conn.bind('disconnected', onDisconnected);
+        conn.bind('connected', onConnected);
+
+        return () => {
+            window.Echo.leave('kitchen');
+            conn.unbind('disconnected', onDisconnected);
+            conn.unbind('connected', onConnected);
+        };
     }, [handleOrderPlaced, handleItemUpdated]);
 
     const advanceItem = useCallback(async (itemId, currentStatus) => {

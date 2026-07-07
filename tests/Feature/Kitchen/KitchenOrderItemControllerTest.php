@@ -3,7 +3,6 @@
 namespace Tests\Feature\Kitchen;
 
 use App\Events\OrderItemStatusUpdated;
-use App\Models\Category;
 use App\Models\DiningSession;
 use App\Models\Order;
 use App\Models\OrderItem;
