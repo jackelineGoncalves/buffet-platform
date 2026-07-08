@@ -9,3 +9,7 @@ Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
 Broadcast::channel('kitchen', function ($user) {
     return in_array($user->role, ['kitchen', 'admin']);
 });
+
+Broadcast::channel('floor', function ($user) {
+    return in_array($user->role, ['floor', 'admin']);
+});

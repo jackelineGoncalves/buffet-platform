@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] - 2026-07-08
+
+### Added
+- **Floor display (`/floor`):** Real-time view for staff with `role=floor` or `role=admin`. Shows ready items grouped by table and pending service requests (bill/waiter calls). Items disappear when marked as delivered; service requests disappear when resolved or paid.
+- `FloorIndexController@index` (`GET /floor`): loads all `OrderItem` records with status `ready` and all unresolved `ServiceRequest` records, eager-loaded with session and table data. Passes `initialReadyItems`, `initialServiceRequests`, and `setting` to `Floor/Index`.
+- `FloorOrderItemController@serve` (`PATCH /floor/order-items/{orderItem}/serve`): marks an item as `served`, calls `syncStatusFromItems()`, dispatches `OrderItemStatusUpdated`.
+- `FloorServiceRequestController@resolve` (`PATCH /floor/service-requests/{serviceRequest}/resolve`): sets `resolved_at = now()` on a pending service request.
+- `FloorPaymentController@store` (`POST /floor/dining-sessions/{session}/payment`): calculates the full bill (buffet × guests, extras, waste × waste_fee, tax), creates a `Payment` record, resolves any open bill service requests, sets session status to `closed`, and dispatches `DiningSessionClosed`.
+- `FloorWasteController@update` (`PATCH /floor/dining-sessions/{session}/waste`): increments or decrements `waste_count` by 1 (delta: +1 or -1, minimum 0).
+- `DinerServiceRequestController@store` (`POST /table/{code}/service-requests`): creates a `ServiceRequest` of type `bill` or `server` on the active session; returns 409 if a pending request of the same type already exists. Dispatches `ServiceRequestCreated`.
+- `ServiceRequestCreated` broadcast event (`ShouldBroadcastNow`) — dispatched when a diner creates a service request. Broadcasts on the private `floor` channel with the request type, `requested_at`, and table code.
+- `DiningSessionClosed` broadcast event (`ShouldBroadcastNow`) — dispatched when a session is closed via payment. Broadcasts on the public `table.{code}` channel so the diner view auto-reloads without requiring authentication.
+- `floor` private channel authorization in `routes/channels.php`: users with `role=floor` or `role=admin`.
+- `OrderItemStatusUpdated` now broadcasts on both `kitchen` and `floor` channels so floor staff receive real-time item status changes.
+- **`Floor/Index.jsx`** — real-time floor page:
+  - Ready items grouped by table with "✓ Entregado" button (optimistic update + PATCH + rollback).
+  - Service requests in yellow: waiter requests show "Resolver" button; bill requests show a full bill breakdown (buffet, extras, desperdicio with +/− buttons, IVA, total) and a "Cobrar y cerrar" button.
+  - Waste counter on bill cards: +/− buttons update `waste_count` optimistically, recalculating the total in real-time.
+  - Echo subscription on private `floor` channel: `OrderItemStatusUpdated` patches ready items; `ServiceRequestCreated` reloads service requests; reconnect resync via `router.reload()`.
+- **`Diner/Table.jsx`** additions:
+  - "Cuenta estimada" section always visible during an active session: buffet × guests, extras, waste fee, IVA, total — calculated from session data already on the page.
+  - "🙋 Llamar mesero" and "🧾 Pedir la cuenta" buttons. The bill button is replaced by a warning message if any order items are still in `firing`, `prep`, or `ready` (not all served yet).
+  - Subscribes to the public `table.{code}` channel via Echo; reloads automatically when `DiningSessionClosed` fires (session closed by floor staff).
+- `role` field added to `Register.jsx` registration form (dropdown: floor / kitchen / admin). Previously the field was missing from the UI, causing all registration attempts to fail validation.
+- `Setting` passed to `Diner/Table` page so bill totals can be calculated on the frontend.
+
+### Changed
+- Floor routes replaced the previous `floor.dashboard` anonymous closure with a proper named-route group under `middleware(['auth', 'role:floor,admin'])` with prefix `/floor`.
+- `AuthenticatedSessionController` post-login redirect updated from `floor.dashboard` to `floor.index`.
+
 ## [Unreleased] - 2026-07-07
 
 ### Added

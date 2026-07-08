@@ -1,5 +1,5 @@
 import { Head, router } from '@inertiajs/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 function csrfToken() {
     return document.querySelector('meta[name="csrf-token"]')?.content ?? '';
@@ -216,7 +216,124 @@ function MenuAndCart({ code, menu, allergens }) {
     );
 }
 
-export default function Table({ code, table, session, menu, allergens }) {
+function BillSummary({ session, setting }) {
+    if (!setting) return null;
+
+    const allItems = session.orders?.flatMap((o) => o.order_items ?? []) ?? [];
+    const extras = allItems.filter((i) => i.unit_price != null);
+    const extrasTotal = extras.reduce(
+        (sum, i) => sum + parseFloat(i.unit_price) * i.qty,
+        0,
+    );
+    const buffetTotal = parseFloat(setting.buffet_price) * session.guests;
+    const wasteTotal = parseFloat(setting.waste_fee) * (session.waste_count ?? 0);
+    const subtotal = buffetTotal + extrasTotal + wasteTotal;
+    const tax = subtotal * parseFloat(setting.tax_rate);
+    const total = subtotal + tax;
+
+    const fmt = (n) =>
+        n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' });
+
+    return (
+        <div className="rounded border border-gray-200 bg-gray-50 p-4 text-sm">
+            <h3 className="mb-2 font-semibold text-gray-700">Cuenta estimada</h3>
+            <table className="w-full text-gray-600">
+                <tbody>
+                    <tr>
+                        <td>Buffet ({session.guests} persona{session.guests !== 1 ? 's' : ''})</td>
+                        <td className="text-right">{fmt(buffetTotal)}</td>
+                    </tr>
+                    {extrasTotal > 0 && (
+                        <tr>
+                            <td>Extras</td>
+                            <td className="text-right">{fmt(extrasTotal)}</td>
+                        </tr>
+                    )}
+                    {wasteTotal > 0 && (
+                        <tr>
+                            <td>Cargo por desperdicio ({session.waste_count} ítem{session.waste_count !== 1 ? 's' : ''})</td>
+                            <td className="text-right">{fmt(wasteTotal)}</td>
+                        </tr>
+                    )}
+                    <tr className="border-t text-gray-500">
+                        <td>IVA ({(parseFloat(setting.tax_rate) * 100).toFixed(0)}%)</td>
+                        <td className="text-right">{fmt(tax)}</td>
+                    </tr>
+                    <tr className="font-bold text-gray-800">
+                        <td>Total</td>
+                        <td className="text-right">{fmt(total)}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    );
+}
+
+function ServiceButtons({ code, session }) {
+    const [sent, setSent] = useState({});
+    const [message, setMessage] = useState(null);
+
+    const hasPendingItems = (session?.orders ?? [])
+        .flatMap((o) => o.order_items ?? [])
+        .some((i) => i.status !== 'served');
+
+    const request = async (type) => {
+        setMessage(null);
+        const { ok, status, data } = await postJson(
+            `/table/${code}/service-requests`,
+            { type },
+        );
+        if (ok) {
+            setSent((prev) => ({ ...prev, [type]: true }));
+        } else if (status === 409) {
+            setSent((prev) => ({ ...prev, [type]: true }));
+        } else {
+            setMessage(data.message ?? 'Error al enviar solicitud.');
+        }
+    };
+
+    return (
+        <div className="space-y-2">
+            <div className="flex flex-wrap gap-3">
+                <button
+                    onClick={() => request('server')}
+                    disabled={sent.server}
+                    className="rounded bg-blue-600 px-4 py-2 text-sm text-white disabled:opacity-50"
+                >
+                    {sent.server ? '✓ Mesero avisado' : '🙋 Llamar mesero'}
+                </button>
+
+                {hasPendingItems ? (
+                    <p className="rounded border border-yellow-300 bg-yellow-50 px-4 py-2 text-sm text-yellow-700">
+                        Tienes pedidos aún en preparación o por entregar.
+                    </p>
+                ) : (
+                    <button
+                        onClick={() => request('bill')}
+                        disabled={sent.bill}
+                        className="rounded bg-gray-800 px-4 py-2 text-sm text-white disabled:opacity-50"
+                    >
+                        {sent.bill ? '✓ Cuenta en camino' : '🧾 Pedir la cuenta'}
+                    </button>
+                )}
+            </div>
+            {message && <p className="text-sm text-red-600">{message}</p>}
+        </div>
+    );
+}
+
+export default function Table({ code, table, session, menu, allergens, setting }) {
+    useEffect(() => {
+        if (!window.Echo || !session) return;
+
+        const channel = window.Echo.channel(`table.${code}`)
+            .listen('.DiningSessionClosed', () => {
+                router.reload();
+            });
+
+        return () => window.Echo.leaveChannel(`table.${code}`);
+    }, [code, session?.id]);
+
     return (
         <>
             <Head title={`Mesa ${code}`} />
@@ -239,6 +356,10 @@ export default function Table({ code, table, session, menu, allergens }) {
                             <h2 className="mb-2 font-bold">Pedidos de esta sesión</h2>
                             <OrdersList orders={session.orders} />
                         </div>
+
+                        <BillSummary session={session} setting={setting} />
+
+                        <ServiceButtons code={code} session={session} />
 
                         <div>
                             <h2 className="mb-2 font-bold">Menú — armar pedido</h2>
