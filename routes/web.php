@@ -4,6 +4,10 @@ use App\Http\Controllers\Diner\DinerOrderController;
 use App\Http\Controllers\Diner\DinerServiceRequestController;
 use App\Http\Controllers\Diner\DinerSessionController;
 use App\Http\Controllers\Diner\DinerTableController;
+use App\Http\Controllers\Admin\AdminDishController;
+use App\Http\Controllers\Admin\AdminIndexController;
+use App\Http\Controllers\Admin\AdminSettingController;
+use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\Floor\FloorIndexController;
 use App\Http\Controllers\Floor\FloorOrderItemController;
 use App\Http\Controllers\Floor\FloorPaymentController;
@@ -33,9 +37,21 @@ Route::get('/dashboard', function () {
     });
 })->middleware('auth')->name('dashboard');
 
-Route::middleware(['auth', 'role:admin'])->get('/admin', function () {
-    return Inertia::render('Dashboard');
-})->name('admin.dashboard');
+Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/', [AdminIndexController::class, 'index'])->name('index');
+
+    Route::get('/dishes', [AdminDishController::class, 'index'])->name('dishes.index');
+    Route::post('/dishes', [AdminDishController::class, 'store'])->name('dishes.store');
+    Route::put('/dishes/{dish}', [AdminDishController::class, 'update'])->name('dishes.update');
+    Route::patch('/dishes/{dish}/toggle', [AdminDishController::class, 'toggle'])->name('dishes.toggle');
+    Route::delete('/dishes/{dish}', [AdminDishController::class, 'destroy'])->name('dishes.destroy');
+
+    Route::get('/settings', [AdminSettingController::class, 'edit'])->name('settings.edit');
+    Route::put('/settings', [AdminSettingController::class, 'update'])->name('settings.update');
+
+    Route::get('/users', [AdminUserController::class, 'index'])->name('users.index');
+    Route::patch('/users/{user}/role', [AdminUserController::class, 'updateRole'])->name('users.update-role');
+});
 
 Route::middleware(['auth', 'role:kitchen,admin'])->prefix('kitchen')->name('kitchen.')->group(function () {
     Route::get('/', [KitchenIndexController::class, 'index'])->name('index');

@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] - 2026-07-08 (admin)
+
+### Added
+- Admin panel (`/admin`) with three sections: dishes, settings, and users.
+- `AdminDishController`: list, create, edit, toggle availability, and delete dishes. Toggle is real-time (no page reload).
+- `AdminSettingController`: view and update `buffet_price`, `waste_fee`, `tax_rate`, `session_minutes`, `last_call_minutes`.
+- `AdminUserController`: list all users with inline role change dropdown; links to `/register` for new staff.
+- Pages: `Admin/Index.jsx`, `Admin/Dishes.jsx`, `Admin/Settings.jsx`, `Admin/Users.jsx`.
+
+### Changed
+- `/admin` route replaced the previous `Dashboard` placeholder with a proper named-route group and `AdminIndexController`.
+- Post-login redirect for `admin` role updated from `admin.dashboard` to `admin.index`.
+
 ## [Unreleased] - 2026-07-08
 
 ### Added
