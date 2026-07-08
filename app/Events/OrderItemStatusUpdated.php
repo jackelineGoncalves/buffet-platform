@@ -17,7 +17,10 @@ class OrderItemStatusUpdated implements ShouldBroadcastNow
 
     public function broadcastOn(): array
     {
-        return [new PrivateChannel('kitchen')];
+        return [
+            new PrivateChannel('kitchen'),
+            new PrivateChannel('floor'),
+        ];
     }
 
     public function broadcastAs(): string

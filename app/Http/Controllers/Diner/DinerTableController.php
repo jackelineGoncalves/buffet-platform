@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Allergen;
 use App\Models\Category;
 use App\Models\RestaurantTable;
+use App\Models\Setting;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -32,6 +33,7 @@ class DinerTableController extends Controller
             'session' => $session,
             'menu' => $menu,
             'allergens' => Allergen::all(),
+            'setting' => Setting::first(),
         ]);
     }
 }

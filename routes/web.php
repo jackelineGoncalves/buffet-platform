@@ -1,8 +1,14 @@
 <?php
 
 use App\Http\Controllers\Diner\DinerOrderController;
+use App\Http\Controllers\Diner\DinerServiceRequestController;
 use App\Http\Controllers\Diner\DinerSessionController;
 use App\Http\Controllers\Diner\DinerTableController;
+use App\Http\Controllers\Floor\FloorIndexController;
+use App\Http\Controllers\Floor\FloorOrderItemController;
+use App\Http\Controllers\Floor\FloorPaymentController;
+use App\Http\Controllers\Floor\FloorServiceRequestController;
+use App\Http\Controllers\Floor\FloorWasteController;
 use App\Http\Controllers\Kitchen\KitchenIndexController;
 use App\Http\Controllers\Kitchen\KitchenOrderItemController;
 use App\Http\Controllers\ProfileController;
@@ -36,9 +42,13 @@ Route::middleware(['auth', 'role:kitchen,admin'])->prefix('kitchen')->name('kitc
     Route::patch('/order-items/{orderItem}', [KitchenOrderItemController::class, 'advance'])->name('order-items.advance');
 });
 
-Route::middleware(['auth', 'role:floor'])->get('/floor', function () {
-    return Inertia::render('Dashboard');
-})->name('floor.dashboard');
+Route::middleware(['auth', 'role:floor,admin'])->prefix('floor')->name('floor.')->group(function () {
+    Route::get('/', [FloorIndexController::class, 'index'])->name('index');
+    Route::patch('/order-items/{orderItem}/serve', [FloorOrderItemController::class, 'serve'])->name('order-items.serve');
+    Route::patch('/service-requests/{serviceRequest}/resolve', [FloorServiceRequestController::class, 'resolve'])->name('service-requests.resolve');
+    Route::post('/dining-sessions/{session}/payment', [FloorPaymentController::class, 'store'])->name('dining-sessions.payment');
+    Route::patch('/dining-sessions/{session}/waste', [FloorWasteController::class, 'update'])->name('dining-sessions.waste');
+});
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -47,8 +57,8 @@ Route::middleware('auth')->group(function () {
 });
 
 Route::post('/table/{code}/session', [DinerSessionController::class, 'store'])->name('diner.session.store');
-
 Route::post('/table/{code}/orders', [DinerOrderController::class, 'store'])->name('diner.orders.store');
+Route::post('/table/{code}/service-requests', [DinerServiceRequestController::class, 'store'])->name('diner.service-requests.store');
 
 Route::get('/table/{code}', [DinerTableController::class, 'show'])->name('diner.table');
 
