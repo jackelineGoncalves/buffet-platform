@@ -1,3 +1,4 @@
+import { Button } from '@/Components/Button';
 import { Head, router } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 
@@ -208,9 +209,20 @@ function MenuAndCart({ code, menu, allergens }) {
                     )}
                 </div>
             ))}
-            <button onClick={handleSubmit} className="rounded bg-green-600 px-3 py-1 text-white">
+         
+
+            <Button variant='primary' size='md' onClick={handleSubmit}> Enviar pedido (nueva ronda)</Button>
+            <Button variant='secondary' size='md' onClick={handleSubmit}> Enviar pedido (nueva ronda)</Button>
+            <Button variant='outline' size='md' onClick={handleSubmit}> Enviar pedido (nueva ronda)</Button>
+            <Button variant='danger' size='md' onClick={handleSubmit}> Enviar pedido (nueva ronda)</Button>
+            <Button variant='secondary' size='md' onClick={handleSubmit} loading> Enviar pedido (nueva ronda)</Button>
+
+
+
+
+            {/* <button onClick={handleSubmit} className="rounded bg-green-600 px-3 py-1 text-white">
                 Enviar pedido (nueva ronda)
-            </button>
+            </button> */}
             {message && <p className="text-red-600">{message}</p>}
         </div>
     );
